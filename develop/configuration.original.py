@@ -39,14 +39,14 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "")
 # Full connection details are required in both sections, even if they are the same.
 REDIS = {
     "caching": {
-        "HOST": os.environ.get("REDIS_HOST", "localhost"),
+        "HOST": os.environ.get("REDIS_HOST", "redis"),
         "PORT": int(os.environ.get("REDIS_PORT", 6379)),
         "PASSWORD": os.environ.get("REDIS_PASSWORD", ""),
         "DATABASE": 1,
         "SSL": bool(os.environ.get("REDIS_SSL", False)),
     },
     "tasks": {
-        "HOST": os.environ.get("REDIS_HOST", "localhost"),
+        "HOST": os.environ.get("REDIS_HOST", "redis"),
         "PORT": int(os.environ.get("REDIS_PORT", 6379)),
         "PASSWORD": os.environ.get("REDIS_PASSWORD", ""),
         "DATABASE": 0,
@@ -151,9 +151,7 @@ NAPALM_ARGS = {
 PAGINATE_COUNT = os.environ.get("PAGINATE_COUNT", 50)
 
 # Enable installed plugins. Add the name of each plugin to the list.
-#PLUGINS = ["netbox_devicetype_importer"]
-PLUGINS = []
-
+PLUGINS = ["netbox_devicetype_importer"]
 
 # Plugins configuration settings. These settings are used by various plugins that the user may have installed.
 # Each key in the dictionary is the name of an installed plugin and its value is a dictionary of settings.

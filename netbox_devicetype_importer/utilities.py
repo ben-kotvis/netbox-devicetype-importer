@@ -138,7 +138,9 @@ class GitHubGQLAPI():
         result = {}
         template = Template(self.tree_query)
         query = template.render(owner=self.owner, repo=self.repo, path=self.path)
+        print(query)
         data = self.get_query(query)
+        
         if not data:
             return result
         for vendor in data['data']['repository']['object']['entries']:

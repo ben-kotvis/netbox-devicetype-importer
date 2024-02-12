@@ -6,7 +6,7 @@ services:
       context: ../
       dockerfile: develop/Dockerfile
     command: >
-      sh -c "python manage.py migrate &&
+      sh -c "../upgrade.sh && python manage.py migrate &&
              python manage.py runserver 0.0.0.0:8000"
     ports:
       - '8000:8000'
@@ -16,7 +16,6 @@ services:
     env_file:
       - ./dev.env
     volumes:
-      - ./configuration.py:/opt/netbox/netbox/netbox/configuration.py
       - ../netbox_devicetype_importer:/source/netbox_devicetype_importer
     tty: true
   worker:
@@ -28,8 +27,7 @@ services:
       - netbox
     env_file:
       - ./dev.env
-    volumes:
-      - ./configuration.py:/opt/netbox/netbox/netbox/configuration.py
+    volumes: 
       - ../netbox_devicetype_importer:/source/netbox_devicetype_importer
     tty: true
   postgres:

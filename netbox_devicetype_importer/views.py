@@ -15,7 +15,8 @@ from netbox.views import generic
 from dcim.models import Manufacturer, DeviceType
 from dcim import forms
 from utilities.views import ContentTypePermissionRequiredMixin
-from utilities.forms import ImportForm, restrict_form_fields
+from utilities.forms import restrict_form_fields
+import yaml
 from utilities.exceptions import AbortTransaction, PermissionsViolation
 
 from .models import MetaDeviceType
@@ -174,57 +175,52 @@ class MetaDeviceTypeImportView(ContentTypePermissionRequiredMixin, View):
                 vendor_count += 1
 
         for sha, yaml_text in dt_files.items():
-            form = ImportForm(data={'data': yaml_text, 'format': 'yaml'})
-            if form.is_valid():
-                data = form.cleaned_data['data']
-                model_form = forms.DeviceTypeImportForm(data)
-                # is it nessescary?
-                restrict_form_fields(model_form, request.user)
-
-                for field_name, field in model_form.fields.items():
-                    if field_name not in data and hasattr(field, 'initial'):
-                        model_form.data[field_name] = field.initial
-
-                if model_form.is_valid():
-                    try:
-                        with transaction.atomic():
-                            obj = model_form.save()
-
-                            for field_name, related_object_form in self.related_object_forms.items():
-                                related_obj_pks = []
-                                for i, rel_obj_data in enumerate(data.get(field_name, list())):
-                                    if int(version_minor) >= 2:
-                                        rel_obj_data.update({'device_type': obj})
-                                        f = related_object_form(rel_obj_data)
-                                    else:
-                                        f = related_object_form(obj, rel_obj_data)
-                                    for subfield_name, field in f.fields.items():
-                                        if subfield_name not in rel_obj_data and hasattr(field, 'initial'):
-                                            f.data[subfield_name] = field.initial
-                                    if f.is_valid():
-                                        related_obj = f.save()
-                                        related_obj_pks.append(related_obj.pk)
-                                    else:
-                                        for subfield_name, errors in f.errors.items():
-                                            for err in errors:
-                                                err_msg = "{}[{}] {}: {}".format(field_name, i, subfield_name, err)
-                                                model_form.add_error(None, err_msg)
-                                        raise AbortTransaction()
-                    except AbortTransaction:
-                        # log ths
-                        pass
-                    except PermissionsViolation:
-                        errored += 1
-                        continue
-                if model_form.errors:
+            form = yaml.safe_load(yaml_text)
+            
+            data = form 
+            model_form = forms.DeviceTypeImportForm(data)
+            # is it nessescary?
+            restrict_form_fields(model_form, request.user)
+            for field_name, field in model_form.fields.items():
+                if field_name not in data and hasattr(field, 'initial'):
+                    model_form.data[field_name] = field.initial
+            if model_form.is_valid():
+                try:
+                    with transaction.atomic():
+                        obj = model_form.save()
+                        for field_name, related_object_form in self.related_object_forms.items():
+                            related_obj_pks = []
+                            for i, rel_obj_data in enumerate(data.get(field_name, list())):
+                                if int(version_minor) >= 2:
+                                    rel_obj_data.update({'device_type': obj})
+                                    f = related_object_form(rel_obj_data)
+                                else:
+                                    f = related_object_form(obj, rel_obj_data)
+                                for subfield_name, field in f.fields.items():
+                                    if subfield_name not in rel_obj_data and hasattr(field, 'initial'):
+                                        f.data[subfield_name] = field.initial
+                                if f.is_valid():
+                                    related_obj = f.save()
+                                    related_obj_pks.append(related_obj.pk)
+                                else:
+                                    for subfield_name, errors in f.errors.items():
+                                        for err in errors:
+                                            err_msg = "{}[{}] {}: {}".format(field_name, i, subfield_name, err)
+                                            model_form.add_error(None, err_msg)
+                                    raise AbortTransaction()
+                except AbortTransaction:
+                    # log ths
+                    pass
+                except PermissionsViolation:
                     errored += 1
-                else:
-                    imported_dt.append(obj.pk)
-                    metadt = MetaDeviceType.objects.get(sha=sha)
-                    metadt.imported_dt = obj.pk
-                    metadt.save()
-            else:
+                    continue
+            if model_form.errors:
                 errored += 1
+            else:
+                imported_dt.append(obj.pk)
+                metadt = MetaDeviceType.objects.get(sha=sha)
+                metadt.imported_dt = obj.pk
+                metadt.save()
         # msg
         if imported_dt:
             messages.success(request, f'Imported: {imported_dt.__len__()}')
