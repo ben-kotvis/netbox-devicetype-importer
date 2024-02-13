@@ -1,4 +1,3 @@
-#yes password | passwd vscode
 adduser vscode sudo
 
 service postgresql restart
