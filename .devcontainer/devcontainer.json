@@ -1,0 +1,47 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/python
+{
+	"name": "Python 3",
+	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+	"build":{
+		"dockerfile":"Dockerfile"
+	},
+	"features": {
+		"ghcr.io/itsmechlark/features/redis-server:1": {}
+	},
+	"mounts": [
+		"source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached"
+	],
+	"containerEnv": {
+		"ALLOWED_HOSTS":"*",
+		"DB_NAME":"netbox",
+		"DB_USER":"netbox",
+		"DB_PASSWORD":"FxHZsQCr6s3qj6EK",
+		"PGPASSWORD":"FxHZsQCr6s3qj6EK",
+		"DB_HOST":"localhost",
+		"NAPALM_TIMEOUT":"5",
+		"MAX_PAGE_SIZE":"0",
+		"SECRET_KEY":"evhLQDsYsMLFQxZMw82jnHt3UYf86FppfdHW",
+		"POSTGRES_USER":"netbox",
+		"POSTGRES_PASSWORD":"FxHZsQCr6s3qj6EK",
+		"POSTGRES_DB":"netbox",
+		"CHANGELOG_RETENTION":"0",
+		"REDIS_HOST":"localhost",
+		"REDIS_PORT": "6379",
+		"REDIS_PASSWORD":"FxHZsQCr6s3qj6EK"
+	},
+	// Features to add to the dev container. More info: https://containers.dev/features.
+	// "features": {},
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+
+	// Use 'postCreateCommand' to run commands after the container is created.
+	"postCreateCommand": "sh /workspaces/netbox-devicetype-importer/.devcontainer/start.sh",
+
+	// Configure tool-specific properties.
+	// "customizations": {},
+
+	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+    "remoteUser": "root"
+}
