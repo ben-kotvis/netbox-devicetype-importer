@@ -1,6 +1,6 @@
+import time
 from collections import OrderedDict
 from urllib.parse import urlencode
-
 
 from django.conf import settings
 from django.db import transaction
@@ -11,11 +11,14 @@ from django.http import HttpResponseForbidden
 from django.shortcuts import redirect, reverse
 from django.utils.text import slugify
 
+from django import forms as dforms
+
 from netbox.views import generic
 from dcim.models import Manufacturer, DeviceType
 from dcim import forms
 from utilities.views import ContentTypePermissionRequiredMixin
-from utilities.forms import restrict_form_fields
+from utilities.forms import BootstrapMixin, restrict_form_fields
+from utilities.forms.bulk_import import BulkImportForm
 import yaml
 from utilities.exceptions import AbortTransaction, PermissionsViolation
 
@@ -25,6 +28,40 @@ from .filters import MetaDeviceTypeFilterSet
 from .forms import MetaDeviceTypeFilterForm
 from .utilities import GitHubAPI, GitHubGQLAPI, GQLError
 
+
+class ImportForm(BootstrapMixin, dforms.Form):
+    """
+    Generic form for creating an object from JSON/YAML data
+    """
+    data = dforms.CharField(
+        widget=dforms.Textarea,
+        help_text="Enter object data in JSON or YAML format. Note: Only a single object/document is supported."
+    )
+    format = dforms.ChoiceField(
+        choices=(
+            ('json', 'JSON'),
+            ('yaml', 'YAML')
+        ),
+        initial='yaml'
+    )
+
+    def clean(self):
+        super().clean()
+
+        data = self.cleaned_data['data']
+        format = self.cleaned_data['format']
+
+        # Check for multiple YAML documents
+        if '\n---' in data:
+            raise dforms.ValidationError({
+                'data': "Import is limited to one object at a time."
+            })
+        try:
+            self.cleaned_data['data'] = yaml.load(data, Loader=yaml.SafeLoader)
+        except yaml.error.YAMLError as err:
+            raise dforms.ValidationError({
+                'data': "Invalid YAML data: {}".format(err)
+            })
 
 class MetaDeviceTypeListView(generic.ObjectListView):
     queryset = MetaDeviceType.objects.all()
@@ -174,23 +211,26 @@ class MetaDeviceTypeImportView(ContentTypePermissionRequiredMixin, View):
             if _:
                 vendor_count += 1
 
-        for sha, yaml_text in dt_files.items():
-            form = yaml.safe_load(yaml_text)
+        for sha, yaml_text in dt_files.items():      
+                  
+            dform = dforms.Form(data=yaml.safe_load(yaml_text))
             
-            data = form 
-            model_form = forms.DeviceTypeImportForm(data)
+            model_form = forms.DeviceTypeImportForm(dform.data)
             # is it nessescary?
             restrict_form_fields(model_form, request.user)
             for field_name, field in model_form.fields.items():
-                if field_name not in data and hasattr(field, 'initial'):
+                if field_name not in dform.data and hasattr(field, 'initial'):
                     model_form.data[field_name] = field.initial
+            
+            model_form.data['_init_time'] = time.time()
+
             if model_form.is_valid():
                 try:
                     with transaction.atomic():
                         obj = model_form.save()
                         for field_name, related_object_form in self.related_object_forms.items():
                             related_obj_pks = []
-                            for i, rel_obj_data in enumerate(data.get(field_name, list())):
+                            for i, rel_obj_data in enumerate(model_form.data.get(field_name, list())):
                                 if int(version_minor) >= 2:
                                     rel_obj_data.update({'device_type': obj})
                                     f = related_object_form(rel_obj_data)
@@ -229,5 +269,8 @@ class MetaDeviceTypeImportView(ContentTypePermissionRequiredMixin, View):
             qparams = urlencode({'id': imported_dt}, doseq=True)
             return redirect(reverse('dcim:devicetype_list') + '?' + qparams)
         else:
-            messages.error(request, 'Can not import Device Types')
+            error_message = ''
+            for key in model_form.errors:
+                error_message += f'{key}: {model_form.errors.get(key)[0]}'
+            messages.error(request, f'Can not import Device Types, {error_message}')
             return redirect('plugins:netbox_devicetype_importer:metadevicetype_list')

@@ -1,7 +1,7 @@
 ARG python_ver=3.8
 FROM mcr.microsoft.com/devcontainers/python:1-3.8-bullseye
 
-ARG netbox_ver=v3.3.3
+ARG netbox_ver=v3.7.0
 ENV PYTHONUNBUFFERED 1
 
 RUN mkdir -p /opt
